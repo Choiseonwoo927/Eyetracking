@@ -1,1 +1,10 @@
-
+{
+    "congruent": [
+        "https://username.github.io/my-experiment/images/congruent/apple-apple.jpg",
+        "https://username.github.io/my-experiment/images/congruent/strawberry-strawberry.jpg"
+    ],
+    "incongruent": [
+        "https://username.github.io/my-experiment/images/incongruent/apple-banana.jpg",
+        "https://username.github.io/my-experiment/images/incongruent/strawberry-pear.jpg"
+    ]
+}
