@@ -1,10 +1,10 @@
 {
     "congruent": [
-        "https://username.github.io/my-experiment/images/congruent/apple-apple.jpg",
-        "https://username.github.io/my-experiment/images/congruent/strawberry-strawberry.jpg"
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/congruent/apple.jpg",
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/congruent/banana.jpg"
     ],
     "incongruent": [
-        "https://username.github.io/my-experiment/images/incongruent/apple-banana.jpg",
-        "https://username.github.io/my-experiment/images/incongruent/strawberry-pear.jpg"
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/incongruent/pear.jpg",
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/incongruent/strawberry.jpg"
     ]
 }
