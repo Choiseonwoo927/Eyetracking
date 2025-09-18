@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>그림-글자 쌍 기억 실험</title>
+    <script src="https://webgazer.cs.brown.edu/webgazer.js" type="text/javascript"></script>
+    <style>
+        body {
+            text-align: center;
+        }
+
+        #stimulus-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 800px;
+            height: 600px;
+        }
+
+        #webgazerVideoFeed {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="stimulus-container"></div>
+    <div id="message">
+        <p>실험을 시작하려면 '시작하기'를 클릭하세요.</p>
+        <button onclick="startExperiment()">시작하기</button>
+    </div>
+
+    <script>
+        let allStimuli = [];
+        let experimentData = [];
+        let currentTrialGazeData = [];
+        let trialStartTime = 0;
+        let responseHandler = null;
+
+        const SPREADSHEET_URL = 'https://script.google.com/macros/s/AKfycbwuwNsk6BrLoGslQRQpFrutmbozG-YpEbbgtYzoho8blXHoqbqd9EPuOS3cNhIQ7IoV/exec';
+        const stimuli_json_url = 'https://Choiseonwoo927.github.io/Eyetracking/conditions/total_cond.json';
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        async function loadStimuli() {
+            try {
+                const response = await fetch(stimuli_json_url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                allStimuli = shuffle(
+                    data.congruent.map(url => ({ url, congruency: 'congruent' }))
+                        .concat(
+                            data.incongruent.map(url => ({ url, congruency: 'incongruent' }))
+                        )
+                );
+            } catch (error) {
+                console.error('자극 파일을 불러오는 데 실패했습니다:', error);
+                document.getElementById('message').innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 실패했습니다. GitHub Pages URL을 확인하세요.</p>';
+            }
+        }
+
+        let currentTrialIndex = 0;
+        function showNextTrial() {
+            if (currentTrialIndex < allStimuli.length) {
+                const currentStim = allStimuli[currentTrialIndex];
+                const stimulusContainer = document.getElementById('stimulus-container');
+                const messageDiv = document.getElementById('message');
+
+                stimulusContainer.innerHTML = '';
+
+                const img = document.createElement('img');
+                img.src = currentStim.url;
+                img.style.maxWidth = '800px';
+                img.style.maxHeight = '600px';
+                stimulusContainer.appendChild(img);
+
+                currentTrialGazeData = [];
+                trialStartTime = performance.now();
+
+                messageDiv.innerHTML = `<p>그림과 글자가 일치하면 z키를, 불일치하면 /키를 눌러주세요. (z, / 키로 반응)</p>`;
+                messageDiv.style.display = 'block';
+
+                responseHandler = function (event) {
+                    if (event.key === 'z' || event.key === '/') {
+                        const reactionTime = performance.now() - trialStartTime;
+
+                        experimentData.push({
+                            trial_index: currentTrialIndex,
+                            stimulus_url: currentStim.url,
+                            congruency: currentStim.congruency,
+                            response: event.key,
+                            reaction_time: reactionTime,
+                            gaze_data: currentTrialGazeData
+                        });
+
+                        window.removeEventListener('keydown', responseHandler);
+                        currentTrialIndex++;
+                        showNextTrial();
+                    }
+                };
+                window.addEventListener('keydown', responseHandler);
+
+            } else {
+                endExperiment();
+            }
+        }
+
+        async function startExperiment() {
+            document.getElementById('message').innerHTML = '<p>웹캠 접근을 허용해주세요...</p>';
+
+            // WebGazer가 완전히 준비될 때까지 기다립니다.
+            await webgazer.begin();
+            webgazer.showPredictionPoints(false);
+
+            // 캘리브레이션 단계를 건너뜁니다.
+            document.getElementById('message').innerHTML = '<p>자극 파일을 불러오는 중...</p>';
+            await loadStimuli();
+
+            if (allStimuli.length === 0) {
+                document.getElementById('message').innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. GitHub Pages URL을 확인하세요.</p>';
+                return;
+            }
+
+            document.getElementById('message').innerHTML = '<p>실험이 곧 시작됩니다...</p>';
+            setTimeout(() => {
+                document.getElementById('message').style.display = 'none';
+                showNextTrial();
+            }, 2000);
+        }
+
+        function endExperiment() {
+            const stimulusContainer = document.getElementById('stimulus-container');
+            stimulusContainer.innerHTML = '';
+            const messageDiv = document.getElementById('message');
+            messageDiv.style.display = 'block';
+            messageDiv.innerHTML = '<p>실험이 모두 끝났습니다. 데이터를 저장하는 중...</p>';
+
+            fetch(SPREADSHEET_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(experimentData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.result === 'success') {
+                        messageDiv.innerHTML = '<p style="color: green;">데이터가 성공적으로 저장되었습니다!</p>';
+                    } else {
+                        messageDiv.innerHTML = '<p style="color: red;">데이터 저장에 실패했습니다. 오류를 확인하세요.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    messageDiv.innerHTML = '<p style="color: red;">데이터 전송 중 오류가 발생했습니다. 개발자 콘솔을 확인하세요.</p>';
+                });
+        }
+    </script>
+</body>
+
+</html>
