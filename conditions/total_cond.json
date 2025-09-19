@@ -6,5 +6,13 @@
     "incongruent": [
         "https://Choiseonwoo927.github.io/Eyetracking/conditions/incongruent/pear.jpg",
         "https://Choiseonwoo927.github.io/Eyetracking/conditions/incongruent/strawberry.jpg"
+    ],
+    "congruent_same": [
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/cong_same/apple.jpg",
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/cong_same/banana.jpg"
+    ],
+    "incongruent_same": [
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/incong_same/pear.jpg",
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions/incong_same/strawberry.jpg"
     ]
 }
