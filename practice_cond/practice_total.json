@@ -1,14 +1,14 @@
 {
     "congruent": [
-        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/congruent/banana_wbanana.JPG",
+        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/congruent/banana_wbanana.JPG"
     ],
     "incongruent": [
-        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/incongruent/wstrawberry_pear.JPG",
+        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/incongruent/wstrawberry_pear.JPG"
     ],
-    "cong_same": [
-        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/cong_same/apple_wapple.JPG",
+    "congruent_same": [
+        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/cong_same/apple_wapple.JPG"
     ],
-    "incong_same": [
-        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/incong_same/wcycle_apple.JPG",
+    "incongruent_same": [
+        "https://Choiseonwoo927.github.io/Eyetracking/practice_cond/incong_same/wcycle_apple.JPG"
     ]
 }
