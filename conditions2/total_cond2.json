@@ -1,1 +1,10 @@
-
+{
+    "congruent": [
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions2/congruent/apple.jpg"
+    ],
+    "incongruent": [
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions2/incongruent/banana.jpg"
+    ],
+    "nonebefore": [
+        "https://Choiseonwoo927.github.io/Eyetracking/conditions2/nonebefore/grape.jpg"
+    ]
