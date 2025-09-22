@@ -2,13 +2,15 @@
 <html>
 
 <head>
-    <title>그림-글자 쌍 기억 실험</title>
+    <title>가천대학교 제4회 학술제 인지 실험</title>
+    <!-- Eyetracking tools: Webgazer using Javascript language -->
     <script src="https://webgazer.cs.brown.edu/webgazer.js" type="text/javascript"></script>
     <style>
         body {
             text-align: center;
         }
 
+        /* the format of the stimuli */
         #stimulus-container {
             position: absolute;
             top: 50%;
@@ -21,6 +23,7 @@
             height: 600px;
         }
 
+        /* the format of the message*/
         #message {
             position: absolute;
             top: 50%;
@@ -28,6 +31,7 @@
             transform: translate(-50%, -50%);
         }
 
+        /* the format of the consent below the code */
         #consent-area {
             max-width: 600px;
             margin: 0 auto;
@@ -54,24 +58,43 @@
 
 <body>
     <div id="message">
-        <p> 안녕하세요. 가천대학교 심리학과 최선우, 이지흠 외 4인입니다. </p>
+        <!-- intro of the experiment -->
+        <p style="font-size: 1.3em;"> 안녕하세요. 가천대학교 심리학과 김에스더, 서해리, 안다온, 이지흠, 최선우, 황은석입니다. </p>
 
-        <p> 위 실험은 제4회 가천대학교 심리학과 학술제에서 그림-글자 자극의 배치와 일치성이 시각작업기억에 미치는 영향을 실험하고자 합니다. </p>
+        <p style="font-weight: bold; font-size: 1.5em;"> 위 실험은 제4회 가천대학교 심리학과 학술제에서 그림-글자 자극의 배치와 일치성이 시각작업기억에 미치는 영향을
+            실험하고자 합니다. </p>
 
-        <p> 실험을 시작하려면 '시작하기'를 클릭하세요. </p>
+        <p style="font-size: 1.3em;"> 본 실험은 대략 3분 ~ 5분 가량 소요될 예정입니다.</p>
+
+        <p style="font-size: 1.3em;"> 실험을 시작하려면 '시작하기'를 클릭하세요. </p>
         <button onclick="startExperiment()">시작하기</button>
     </div>
 
     <script>
+        // setting the first variables
         let allStimuli = [];
-        let experimentData = [];
+        let exp2Stimuli = [];
+        let practiceStimuli = [];
+        let experiment1Data = [];
+        let experiment2Data = [];
         let currentTrialGazeData = [];
         let trialStartTime = 0;
         let responseHandler = null;
+        let isPracticePhase = true;
+        let currentPracticeTrialIndex = 0;
+        let currentTrialIndex = 0;
+        let currentExperimentNumber = 1;
 
-        const SPREADSHEET_URL = 'https://script.google.com/macros/s/AKfycbwuwNsk6BrLoGslQRQpFrutmbozG-YpEbbgtYzoho8blXHoqbqd9EPuOS3cNhIQ7IoV/exec';
-        const stimuli_json_url = 'https://Choiseonwoo927.github.io/Eyetracking/conditions/total_cond.json';
+        // spreadsheet urls for the save experiment data
+        const SPREADSHEET_URL_EXP1 = 'https://script.google.com/macros/s/AKfycbwuwNsk6BrLoGslQRQpFrutmbozG-YpEbbgtYzoho8blXHoqbqd9EPuOS3cNhIQ7IoV/exec';
+        const SPREADSHEET_URL_EXP2 = 'https://script.google.com/macros/s/AKfycbwq_ksQ0-hEMzZyscUWUdxUtU36ypS45RFGJjmeDYhG8IgLDP8oC-Mal_2HONcdz6sh/exec';
 
+        // Github urls for the stimuli
+        const stimuli_json_url_exp1 = 'https://Choiseonwoo927.github.io/Eyetracking/conditions/total_cond.json'; // experiment 1
+        const stimuli_json_url_exp2 = 'https://Choiseonwoo927.github.io/Eyetracking/conditions2/total_cond2.json'; // experiment 2
+        const practice_stimuli_json_url = 'https://Choiseonwoo927.github.io/Eyetracking/practice_cond/practice_total.json'; // practice experiment
+
+        // randomly shuffle to the stimuili for random assignment of stimuli conditions
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -80,53 +103,80 @@
             return array;
         }
 
-        async function loadStimuli() {
+        // load the practice stimuli
+        // condition: congruent, incongruent, cong_same(duplication of congruent stim), incong_same(duplication of incongruent stim)
+        async function loadPracticeStimuli() {
             try {
-                const response = await fetch(stimuli_json_url);
+                const response = await fetch(practice_stimuli_json_url);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
 
+                practiceStimuli = data.congruent.map(url => ({ url, congruency: 'congruent' }))
+                    .concat(
+                        data.incongruent.map(url => ({ url, congruency: 'incongruent' })),
+                        data.cong_same.map(url => ({ url, congruency: 'cong_same' })),
+                        data.incong_same.map(url => ({ url, congruency: 'incong_same' }))
+                    );
+            } catch (error) {
+                console.error('연습 자극 파일을 불러오는 데 실패했습니다:', error);
+                document.getElementById('message').innerHTML = '<p style="color:red;">연습 자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
+            }
+        }
+
+        // load the experiment 1 stimuli
+        // condition: congruent, incongruent, cong_same, incong_same
+        async function loadStimuliExp1() {
+            try {
+                const response = await fetch(stimuli_json_url_exp1);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
                 allStimuli = shuffle(
                     data.congruent.map(url => ({ url, congruency: 'congruent' }))
                         .concat(
                             data.incongruent.map(url => ({ url, congruency: 'incongruent' })),
-                            data.congruent_same.map(url => ({ url, congruency: 'congruent_same' })),
-                            data.incongruent_same.map(url => ({ url, congruency: 'incongruent_same' }))
+                            data.cong_same.map(url => ({ url, congruency: 'cong_same' })),
+                            data.incong_same.map(url => ({ url, congruency: 'incong_same' }))
                         )
                 );
             } catch (error) {
                 console.error('자극 파일을 불러오는 데 실패했습니다:', error);
-                document.getElementById('message').innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. GitHub Pages URL을 확인하세요.</p>';
+                document.getElementById('message').innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
             }
         }
 
-        let currentTrialIndex = 0;
-        function showNextTrial() {
-            if (currentTrialIndex < allStimuli.length) {
-                const currentStim = allStimuli[currentTrialIndex];
-                const messageDiv = document.getElementById('message');
-
-                // 첫 번째 시행에만 지시문을 보여줍니다.
-                if (currentTrialIndex === 0) {
-                    messageDiv.innerHTML = `<p>그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요. (키보드의 z, / 키로 반응)</p>`;
-                    messageDiv.style.display = 'block';
-
-                    setTimeout(() => {
-                        messageDiv.style.display = 'none';
-                        displayStimulus(currentStim);
-                    }, 5000); // 5초 후 자극 제시
-                } else {
-                    // 첫 번째 시행 이후에는 바로 자극을 제시합니다.
-                    displayStimulus(currentStim);
+        // load the experiment 2 stimuli
+        // condition: congruent, incongruent, nonebefore(not include stim of the previous experiment)
+        async function loadStimuliExp2() {
+            try {
+                const response = await fetch(stimuli_json_url_exp2);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            } else {
-                endExperiment();
+                const data = await response.json();
+                exp2Stimuli = shuffle(
+                    data.congruent.map(url => ({ url, congruency: 'congruent' }))
+                        .concat(
+                            data.incongruent.map(url => ({ url, congruency: 'incongruent' })),
+                            data.nonebefore.map(url => ({ url, congruency: 'nonebefore' }))
+                        )
+                );
+            } catch (error) {
+                console.error('자극 파일을 불러오는 데 실패했습니다:', error);
+                document.getElementById('message').innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
             }
         }
 
-        function displayStimulus(stimulus) {
+        // run a trial of all experiment
+        function runTrial(stimulus, isPractice) {
+            const messageDiv = document.getElementById('message');
+            if (messageDiv) {
+                messageDiv.style.display = 'none';
+            }
+
             let stimulusContainer = document.getElementById('stimulus-container');
             if (!stimulusContainer) {
                 stimulusContainer = document.createElement('div');
@@ -136,46 +186,135 @@
 
             stimulusContainer.innerHTML = '';
 
+            // format of the stim image: 800x600px
             const img = document.createElement('img');
             img.src = stimulus.url;
             img.style.maxWidth = '800px';
             img.style.maxHeight = '600px';
             stimulusContainer.appendChild(img);
 
-            currentTrialGazeData = [];
-            trialStartTime = performance.now();
+            currentTrialGazeData = []; // variables for gaze tracking
+            trialStartTime = performance.now(); // trial start time for calculate reaction time(RT)
 
+            // resonse key: 'z' or '/', only two key is allowed
             responseHandler = function (event) {
                 if (event.key === 'z' || event.key === '/') {
-                    const reactionTime = performance.now() - trialStartTime;
+                    const reactionTime = performance.now() - trialStartTime; // calculate RT
 
                     stimulusContainer.innerHTML = '';
 
-                    experimentData.push({
-                        trial_index: currentTrialIndex,
-                        stimulus_url: stimulus.url,
-                        congruency: stimulus.congruency,
-                        response: event.key,
-                        reaction_time: reactionTime,
-                        gaze_data: currentTrialGazeData
-                    });
+                    // record the trial data, but not save the practice data in spreadsheet
+                    if (!isPractice) {
+                        const trialData = {
+                            trial_index: currentTrialIndex,
+                            stimulus_url: stimulus.url,
+                            congruency: stimulus.congruency,
+                            response: event.key,
+                            reaction_time: reactionTime,
+                            experiment_number: currentExperimentNumber
+                        };
+                        if (currentExperimentNumber === 1) { // only record gaze data in experiment 1, not experiment 2
+                            trialData.gaze_data = currentTrialGazeData;
+                            experiment1Data.push(trialData);
+                        } else {
+                            experiment2Data.push(trialData);
+                        }
+
+                        currentTrialIndex++;
+                    } else {
+                        currentPracticeTrialIndex++;
+                    }
 
                     window.removeEventListener('keydown', responseHandler);
-                    currentTrialIndex++;
-                    showNextTrial();
+
+                    if (isPracticePhase) {
+                        showNextPracticeTrial();
+                    } else {
+                        showNextTrial();
+                    }
                 }
             };
             window.addEventListener('keydown', responseHandler);
         }
 
+        // explain the next practice trial
+        function showNextPracticeTrial() {
+            if (currentPracticeTrialIndex === 0) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.innerHTML = `<p style = "font-size: 1.5em;">연습 시행이 곧 시작됩니다.</p>
+                <p style = "font-size: 1.3em;">그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
+                messageDiv.style.display = 'block';
+
+                // delay for 2 seconds
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                    runTrial(practiceStimuli[currentPracticeTrialIndex], true);
+                }, 2000);
+            } else if (currentPracticeTrialIndex < practiceStimuli.length) {
+                const practiceStim = practiceStimuli[currentPracticeTrialIndex];
+                runTrial(practiceStim, true);
+            } else {
+                isPracticePhase = false;
+                const messageDiv = document.getElementById('message');
+                messageDiv.style.display = 'block';
+                messageDiv.innerHTML = `<p style="font-size: 1.5em;">연습이 끝났습니다. 이제 본 실험이 시작됩니다.</p>`;
+
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                    showNextTrial();
+                }, 2000);
+            }
+        }
+
+        // explain the next trial both experiment 1, 2
+        function showNextTrial() {
+            const currentStimuliSet = currentExperimentNumber === 1 ? allStimuli : exp2Stimuli;
+            if (currentTrialIndex < currentStimuliSet.length) {
+                const currentStim = currentStimuliSet[currentTrialIndex];
+
+                const messageDiv = document.getElementById('message');
+                messageDiv.style.display = 'block';
+
+                if (currentTrialIndex === 0) {
+                    if (currentExperimentNumber === 1) {
+                        // text for experiment 1 in the first trial
+                        messageDiv.innerHTML = `<p style  = "font-size: 1.3em;">그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
+                    } else if (currentExperimentNumber === 2) {
+                        // text for experiment 2 in the first trial
+                        messageDiv.innerHTML = `<p style = "font-size: 1.5em;">지금부터 제시되는 자극이 앞서 있었던 자극인지 반응해주세요.</p>
+                                                <p style = "font-size: 1.3em;"> 있었으면 'z'키를, 없었으면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
+                    }
+
+                    // delay for 5 seconds before running the trial
+                    setTimeout(() => {
+                        messageDiv.style.display = 'none';
+                        runTrial(currentStim, false);
+                    }, 5000);
+                } else {
+                    runTrial(currentStim, false);
+                }
+            } else {
+                endCurrentExperimentPhase();
+            }
+        }
+
+        // text of the consent to personal information
+        function getConsentText() {
+            return `
+                <p style="text-align: center; font-size: 1.2em; font-weight: bold;">개인정보 수집 및 이용 동의</p>
+                <p>본 실험은 참가자의 시선 데이터를 수집합니다. 수집된 데이터는 연구 목적으로만 활용되며, 개인을 식별할 수 있는 정보는 포함되지 않습니다. 수집된 데이터는 안전하게 보관되며, 연구 종료 후 파기됩니다.</p>
+                <p>또한 본 실험은 원활한 실험 결과 수집을 위하여 웹캠이 원활하게 사용 가능한 환경에서 해주시길 바랍니다.</p>
+                <p>실험 참여에 동의하십니까? (실험 담당자: 가천대학교 심리학과 최선우, csw1015@gachon.ac.kr)</p>
+            `;
+        }
+
+        // checkbox of the consent
         async function startExperiment() {
             const messageDiv = document.getElementById('message');
             messageDiv.innerHTML = `
                 <div id="consent-area">
                     <div id="consent-text">
-                        <p style="text-align: center; font-size: 1.2em; font-weight: bold;">개인정보 수집 및 이용 동의</p>
-                        <p>본 실험은 참가자의 시선 데이터를 수집합니다. 수집된 데이터는 연구 목적으로만 활용되며, 개인을 식별할 수 있는 정보는 포함되지 않습니다. 수집된 데이터는 안전하게 보관되며, 연구 종료 후 파기됩니다.</p>
-                        <p>실험 참여에 동의하십니까? (실험 담당자: 가천대학교 심리학과 최선우, 010-7462-3224)</p>
+                        ${getConsentText()}
                     </div>
                     <label for="consent-checkbox">
                         <input type="checkbox" id="consent-checkbox" style="margin-right: 10px;"> 개인정보 수집 및 이용에 동의합니다.
@@ -194,9 +333,12 @@
             }
         }
 
+        // ready to the experiment
         async function continueExperiment() {
             const messageDiv = document.getElementById('message');
-            messageDiv.innerHTML = '<p>웹캠 접근을 허용해주세요...</p>';
+            // message of the acessing webcam
+            messageDiv.innerHTML = `<p style = "font-size: 1.5em;">웹캠 접근을 허용해주세요...</p>
+            <p>원활한 실험 진행을 위해 왼쪽 상단 웹캠 화면의 박스 칸이 초록색이 되도록 해주세요.`;
 
             webgazer.setGazeListener(function (data, elapsedTime) {
                 if (data == null) return;
@@ -210,22 +352,33 @@
             await webgazer.begin();
             webgazer.showPredictionPoints(false);
 
+            // loading the stimuli
             messageDiv.innerHTML = '<p>자극 파일을 불러오는 중...</p>';
-            await loadStimuli();
 
-            if (allStimuli.length === 0) {
-                messageDiv.innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. GitHub Pages URL을 확인하세요.</p>';
+            await loadPracticeStimuli();
+            await loadStimuliExp1();
+            await loadStimuliExp2();
+
+            if (practiceStimuli.length === 0) {
+                messageDiv.innerHTML = '<p style="color:red;">연습 자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
                 return;
             }
 
-            messageDiv.innerHTML = '<p>실험이 곧 시작됩니다...</p>';
+            if (allStimuli.length === 0 || exp2Stimuli.length === 0) {
+                messageDiv.innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
+                return;
+            }
+
+            messageDiv.innerHTML = `<p style = "font-size: 1.5em;">실험이 곧 시작됩니다...</p>
+            <p>원활한 시선 데이터 수집을 위해 모니터의 한가운데를 바라봐주세요.</p>`;
+            // delay for 2 seconds
             setTimeout(() => {
                 messageDiv.style.display = 'none';
-                showNextTrial();
+                showNextPracticeTrial();
             }, 2000);
         }
 
-        function endExperiment() {
+        function endCurrentExperimentPhase() {
             const stimulusContainer = document.getElementById('stimulus-container');
             if (stimulusContainer) {
                 stimulusContainer.remove();
@@ -233,27 +386,61 @@
 
             const messageDiv = document.getElementById('message');
             messageDiv.style.display = 'block';
-            messageDiv.innerHTML = '<p>실험이 모두 끝났습니다. 데이터를 저장하는 중...</p>';
 
-            fetch(SPREADSHEET_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(experimentData)
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.result === 'success') {
-                        messageDiv.innerHTML = `
-                        <p style="color: green;"> 데이터가 성공적으로 저장되었습니다! </p>
-                        <p style="size: 1.2em;"> 참여해주셔서 감사합니다. </p>`;
-                    } else {
-                        messageDiv.innerHTML = '<p style="color: red;">데이터 저장에 실패했습니다. 실험 담당자에게 연락 바랍니다.</p>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    messageDiv.innerHTML = '<p style="color: red;">데이터 전송 중 오류가 발생했습니다. 실험 담당자에게 연락 바랍니다.</p>';
+            if (currentExperimentNumber === 1) {
+                // move to the experiment 2
+                messageDiv.innerHTML = '<p style="font-size: 3em;">+</p>';
+                webgazer.end();
+                currentExperimentNumber = 2;
+                currentTrialIndex = 0;
+
+                // delay for 5 seconds and display the '+'
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                    showNextTrial();
+                }, 5000);
+            } else {
+                // save the experiment data to the each spreadsheet
+                messageDiv.innerHTML = `<p style = "font-size: 1.3em;">실험이 모두 끝났습니다. 데이터를 저장하는 중...</p>
+                <p style = "font-size: 1.3em;">위 과정은 몇 분 가량 소요될 수 있습니다.</p>`;
+
+                // send the experiment 1 data
+                const saveExp1 = fetch(SPREADSHEET_URL_EXP1, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(experiment1Data)
+                }).then(res => res.json()).catch(err => {
+                    console.error('Error saving Exp 1 data:', err);
+                    return { result: 'fail' };
                 });
+
+                // send the experiment 2 data
+                const saveExp2 = fetch(SPREADSHEET_URL_EXP2, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(experiment2Data)
+                }).then(res => res.json()).catch(err => {
+                    console.error('Error saving Exp 2 data:', err);
+                    return { result: 'fail' };
+                });
+
+                Promise.all([saveExp1, saveExp2]).then(results => {
+                    const exp1Success = results[0].result === 'success';
+                    const exp2Success = results[1].result === 'success';
+
+                    if (exp1Success && exp2Success) {
+                        messageDiv.innerHTML = `
+                            <p style="color: green; font-size: 1.5em;"> 데이터가 성공적으로 저장되었습니다! </p>
+                            <p style="font-size: 1.5em;"> 참여해주셔서 감사합니다. </p>`;
+                    } else if (exp1Success) {
+                        messageDiv.innerHTML = '<p style="color: red;">실험 2 데이터 저장에 실패했습니다. 실험 담당자에게 연락 바랍니다.</p>';
+                    } else if (exp2Success) {
+                        messageDiv.innerHTML = '<p style="color: red;">실험 1 데이터 저장에 실패했습니다. 실험 담당자에게 연락 바랍니다.</p>';
+                    } else {
+                        messageDiv.innerHTML = '<p style="color: red;">데이터 저장에 모두 실패했습니다. 실험 담당자에게 연락 바랍니다.</p>';
+                    }
+                });
+            }
         }
     </script>
 </body>
