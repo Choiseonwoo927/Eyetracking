@@ -29,6 +29,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            z-index: 1000;
         }
 
         /* the format of the consent below the code */
@@ -53,16 +54,59 @@
             font-size: 1.1em;
             margin-top: 20px;
         }
+
+        /* the format of the calibration */
+        #calibration-area {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            display: none;
+            cursor: crosshair;
+        }
+
+        .calibration-point {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: red;
+            position: absolute;
+            cursor: pointer;
+            z-index: 2001;
+            display: none;
+            line-height: 25px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
     </style>
 </head>
 
 <body>
+    <div id="calibration-area">
+        <p id="cal-instructions"
+            style="color: white; position: absolute; top: 10%; left: 50%; transform: translate(-50%); font-size: 1.5em; z-index: 2002;">
+        </p>
+    </div>
+
     <div id="message">
         <!-- intro of the experiment -->
         <p style="font-size: 1.3em;"> 안녕하세요. 가천대학교 심리학과 김에스더, 서해리, 안다온, 이지흠, 최선우, 황은석입니다. </p>
 
         <p style="font-weight: bold; font-size: 1.5em;"> 위 실험은 제4회 가천대학교 심리학과 학술제에서 그림-글자 자극의 배치와 일치성이 시각작업기억에 미치는 영향을
             실험하고자 합니다. </p>
+
+        <p style="font-size: 1.5em; font-weight: bold; color: red;">실험 1은 자극(그림-글자, 글자-그림)이 일치하면 'z'키를, 불일치하면 '/'키를
+            눌러주세요.</p>
+
+        <p style="font-size: 1.5em; font-weight: bold; color: red;">실험 2는 실험1에 제시된 자극(쌍과 순서가 동일해야 함.)이면 'z'키를, 미제시 자극(쌍,
+            순서 등)이면 '/'키를 눌러주세요.</p>
 
         <p style="font-size: 1.3em;"> 본 실험은 대략 3분 ~ 5분 가량 소요될 예정입니다.</p>
 
@@ -84,6 +128,17 @@
         let currentPracticeTrialIndex = 0;
         let currentTrialIndex = 0;
         let currentExperimentNumber = 1;
+
+        // setting the calibration variables
+        const CALIBRATION_POINTS = [
+            [5, 5], [50, 5], [95, 5],
+            [5, 50], [50, 50], [95, 50],
+            [5, 95], [50, 95], [95, 95]
+        ];
+        const CLICKS_PER_POINT = 5;
+        let currentCalibrationPointIndex = 0;
+        let currentCalibrationClicks = 0;
+        let calibrationInProgress = false;
 
         // spreadsheet urls for the save experiment data
         const SPREADSHEET_URL_EXP1 = 'https://script.google.com/macros/s/AKfycbwuwNsk6BrLoGslQRQpFrutmbozG-YpEbbgtYzoho8blXHoqbqd9EPuOS3cNhIQ7IoV/exec';
@@ -161,13 +216,112 @@
                     data.congruent.map(url => ({ url, congruency: 'congruent' }))
                         .concat(
                             data.incongruent.map(url => ({ url, congruency: 'incongruent' })),
-                            data.nonebefore.map(url => ({ url, congruency: 'nonebefore' }))
+                            data.cong_none.map(url => ({ url, congruency: 'cong_none' })),
+                            data.incong_none.map(url => ({ url, congruency: 'incong_none' }))
                         )
                 );
             } catch (error) {
                 console.error('자극 파일을 불러오는 데 실패했습니다:', error);
                 document.getElementById('message').innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
             }
+        }
+
+        // calibration function
+        function startCalibration() {
+            calibrationInProgress = true;
+            const calArea = document.getElementById('calibration-area');
+            const instructions = document.getElementById('cal-instructions');
+            calArea.style.display = 'block';
+            instructions.innerHTML = '빨간 점을 **응시하면서** 5번씩 클릭해 주세요.';
+
+            // generate calibration points
+            CALIBRATION_POINTS.forEach((point, index) => {
+                const pointElement = document.createElement('div');
+                pointElement.classList.add('calibration-point');
+                pointElement.id = `cal-point-${index}`;
+                // coordinate of the point on the screen center
+                pointElement.style.left = `calc(${point[0]}% - 25px)`;
+                pointElement.style.top = `calc(${point[1]}% - 25px)`;
+                pointElement.onclick = handleCalibrationClick;
+                pointElement.innerHTML = index + 1;
+                calArea.appendChild(pointElement);
+            });
+
+            currentCalibrationPointIndex = 0;
+            currentCalibrationClicks = 0;
+            webgazer.clearData(); // clear the gaze data
+            showNextCalibrationPoint();
+        }
+
+        function showNextCalibrationPoint() {
+            const points = document.querySelectorAll('.calibration-point');
+
+            if (currentCalibrationPointIndex >= CALIBRATION_POINTS.length) {
+                finishCalibration();
+                return;
+            }
+
+            points.forEach(p => p.style.display = 'none');
+
+            // display the next calibration point
+            const currentPoint = points[currentCalibrationPointIndex];
+            currentPoint.style.display = 'flex';
+            currentPoint.style.justifyContent = 'center';
+            currentPoint.style.alignItems = 'center';
+
+            const instructions = document.getElementById('cal-instructions');
+            instructions.innerHTML = `<p>현재 지점: ${currentCalibrationPointIndex + 1} / ${CALIBRATION_POINTS.length}. ${currentCalibrationClicks} / ${CLICKS_PER_POINT}번 클릭</p>
+            <p stlye = "font-weight: bold;">빨간 점을 응시하면서 클릭해 주세요.</p>
+            <p> 점의 색깔이 초록색이 되면 성공입니다. </p>`;
+        }
+
+        function handleCalibrationClick(event) {
+            if (!calibrationInProgress) return;
+
+            const pointElement = event.target;
+
+            // take the WebGazer calibration data
+            // learn the position of the calibration point
+            webgazer.recordScreenPosition(event.clientX, event.clientY, "click");
+
+            currentCalibrationClicks++;
+
+            // visual feedback of the click
+            pointElement.style.backgroundColor = 'green';
+            setTimeout(() => pointElement.style.backgroundColor = 'red', 100);
+
+            const instructions = document.getElementById('cal-instructions');
+            instructions.innerHTML = `<p>현재 지점: ${currentCalibrationPointIndex + 1} / ${CALIBRATION_POINTS.length}. ${currentCalibrationClicks} / ${CLICKS_PER_POINT}번 클릭</p>
+            <p stlye = "font-weight: bold;">빨간 점을 응시하면서 클릭해 주세요.</p>
+            <p> 점의 색깔이 초록색이 되면 성공입니다. </p>`;
+
+
+            if (currentCalibrationClicks >= CLICKS_PER_POINT) {
+                currentCalibrationPointIndex++;
+                currentCalibrationClicks = 0;
+                // 0.5s delay
+                setTimeout(showNextCalibrationPoint, 500);
+            }
+        }
+
+        function finishCalibration() {
+            calibrationInProgress = false;
+            const calArea = document.getElementById('calibration-area');
+            calArea.style.display = 'none';
+
+            webgazer.showPredictionPoints(false);
+
+            document.querySelectorAll('.calibration-point').forEach(p => p.remove());
+
+            const messageDiv = document.getElementById('message');
+            messageDiv.style.display = 'block';
+            messageDiv.innerHTML = `<p style="font-size: 1.5em; color: green; font-weight: bold;">캘리브레이션이 완료되었습니다!</p>`;
+
+            // after 2s, show the next practice trial
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+                showNextPracticeTrial();
+            }, 2000);
         }
 
         // run a trial of all experiment
@@ -242,14 +396,15 @@
             if (currentPracticeTrialIndex === 0) {
                 const messageDiv = document.getElementById('message');
                 messageDiv.innerHTML = `<p style = "font-size: 1.5em;">연습 시행이 곧 시작됩니다.</p>
-                <p style = "font-size: 1.3em;">그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
+                <p style = "font-size: 1.5em;">그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
                 messageDiv.style.display = 'block';
 
-                // delay for 2 seconds
+                // delay for 5 seconds
                 setTimeout(() => {
                     messageDiv.style.display = 'none';
                     runTrial(practiceStimuli[currentPracticeTrialIndex], true);
-                }, 2000);
+                }, 5000);
+
             } else if (currentPracticeTrialIndex < practiceStimuli.length) {
                 const practiceStim = practiceStimuli[currentPracticeTrialIndex];
                 runTrial(practiceStim, true);
@@ -262,7 +417,7 @@
                 setTimeout(() => {
                     messageDiv.style.display = 'none';
                     showNextTrial();
-                }, 2000);
+                }, 5000);
             }
         }
 
@@ -278,11 +433,11 @@
                 if (currentTrialIndex === 0) {
                     if (currentExperimentNumber === 1) {
                         // text for experiment 1 in the first trial
-                        messageDiv.innerHTML = `<p style  = "font-size: 1.3em;">그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
+                        messageDiv.innerHTML = `<p style  = "font-size: 1.5em; font-weight: bold;">그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요.</p><p style = "font-size: 1.3em;">그림과 글자가 일치하면 'z'키를, 불일치하면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
                     } else if (currentExperimentNumber === 2) {
                         // text for experiment 2 in the first trial
-                        messageDiv.innerHTML = `<p style = "font-size: 1.5em;">지금부터 제시되는 자극이 앞서 있었던 자극인지 반응해주세요.</p>
-                                                <p style = "font-size: 1.3em;"> 있었으면 'z'키를, 없었으면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
+                        messageDiv.innerHTML = `<p style = "font-size: 1.7em; font-weight: bold;">지금부터 제시되는 자극의 쌍이 앞서 있었던 자극인지 반응해주세요.</p>
+                                                     <p style = "font-size: 1.7em; font-weight: bold;"> 앞에 있었으면 'z'키를, 앞에 없었으면 '/'키를 눌러주세요. (키보드의 'z', '/' 키로 반응)</p>`;
                     }
 
                     // delay for 5 seconds before running the trial
@@ -337,9 +492,10 @@
         async function continueExperiment() {
             const messageDiv = document.getElementById('message');
             // message of the acessing webcam
-            messageDiv.innerHTML = `<p style = "font-size: 1.5em;">웹캠 접근을 허용해주세요...</p>
-            <p>원활한 실험 진행을 위해 왼쪽 상단 웹캠 화면의 박스 칸이 초록색이 되도록 해주세요.`;
+            messageDiv.innerHTML = `<p style = "font-weight: bold; font-size: 1.5em;">웹캠 접근을 허용해주세요...</p>
+            <p style = "font-size: 1.3em;">원활한 실험 진행을 위해 왼쪽 상단 웹캠 화면의 박스 칸이 초록색이 되도록 해주세요.</p>`;
 
+            // setting the Gaze Listener
             webgazer.setGazeListener(function (data, elapsedTime) {
                 if (data == null) return;
                 currentTrialGazeData.push({
@@ -349,33 +505,23 @@
                 });
             });
 
+            // start and setting the WebGazer
             await webgazer.begin();
-            webgazer.showPredictionPoints(false);
+            webgazer.showPredictionPoints(true);
+
+            // start the calibration
+            messageDiv.style.display = 'none';
+            startCalibration();
 
             // loading the stimuli
-            messageDiv.innerHTML = '<p>자극 파일을 불러오는 중...</p>';
-
             await loadPracticeStimuli();
             await loadStimuliExp1();
             await loadStimuliExp2();
 
-            if (practiceStimuli.length === 0) {
-                messageDiv.innerHTML = '<p style="color:red;">연습 자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
-                return;
+            if (practiceStimuli.length === 0 || allStimuli.length === 0 || exp2Stimuli.length === 0) {
+                document.getElementById('message').innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
+                document.getElementById('message').style.display = 'block';
             }
-
-            if (allStimuli.length === 0 || exp2Stimuli.length === 0) {
-                messageDiv.innerHTML = '<p style="color:red;">자극 파일을 불러오는 데 문제가 있습니다. 실험 담당자에게 연락 바랍니다.</p>';
-                return;
-            }
-
-            messageDiv.innerHTML = `<p style = "font-size: 1.5em;">실험이 곧 시작됩니다...</p>
-            <p>원활한 시선 데이터 수집을 위해 모니터의 한가운데를 바라봐주세요.</p>`;
-            // delay for 2 seconds
-            setTimeout(() => {
-                messageDiv.style.display = 'none';
-                showNextPracticeTrial();
-            }, 2000);
         }
 
         function endCurrentExperimentPhase() {
